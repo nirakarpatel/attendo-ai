@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Pencil, X, Plus, Minus } from "lucide-react";
 import { Card } from "./ui/Card";
 import { Button } from "./ui/Button";
@@ -7,19 +7,43 @@ export function EditAttendance({ subject, isOpen, onClose, onSave }) {
     const [attended, setAttended] = useState(subject.attended);
     const [total, setTotal] = useState(subject.total);
 
+    // Reset values when modal opens or subject changes
+    useEffect(() => {
+        if (isOpen) {
+            setAttended(subject.attended);
+            setTotal(subject.total);
+        }
+    }, [isOpen, subject.attended, subject.total]);
+
     if (!isOpen) return null;
 
     const handleSave = () => {
-        // Ensure attended doesn't exceed total
-        const validAttended = Math.min(attended, total);
-        onSave({ ...subject, attended: validAttended, total });
+        onSave({ ...subject, attended, total });
         onClose();
     };
 
-    const adjustValue = (setter, currentValue, delta, min = 0) => {
-        const newValue = currentValue + delta;
-        if (newValue >= min) {
-            setter(newValue);
+    // Increase attended - also increases total automatically
+    const increaseAttended = () => {
+        setAttended(prev => prev + 1);
+        setTotal(prev => Math.max(prev, attended + 1)); // Total must be >= new attended
+    };
+
+    // Decrease attended - but can't go below 0
+    const decreaseAttended = () => {
+        if (attended > 0) {
+            setAttended(prev => prev - 1);
+        }
+    };
+
+    // Increase total
+    const increaseTotal = () => {
+        setTotal(prev => prev + 1);
+    };
+
+    // Decrease total - but can't go below attended
+    const decreaseTotal = () => {
+        if (total > attended) {
+            setTotal(prev => prev - 1);
         }
     };
 
@@ -44,24 +68,23 @@ export function EditAttendance({ subject, isOpen, onClose, onSave }) {
                 </div>
 
                 <div className="space-y-6">
-                    {/* Attended Classes */}
+                    {/* Classes Attended */}
                     <div className="bg-secondary/30 rounded-xl p-4">
                         <label className="text-sm font-medium text-muted-foreground mb-3 block">
-                            Classes Attended
+                            Classes Attended <span className="text-xs text-emerald-400">(+1 also adds to total)</span>
                         </label>
                         <div className="flex items-center justify-between gap-4">
                             <button
-                                onClick={() => adjustValue(setAttended, attended, -1)}
-                                className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 flex items-center justify-center transition-colors"
+                                onClick={decreaseAttended}
+                                className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 flex items-center justify-center transition-colors disabled:opacity-30"
                                 disabled={attended <= 0}
                             >
                                 <Minus className="w-5 h-5" />
                             </button>
                             <span className="text-4xl font-bold text-emerald-400">{attended}</span>
                             <button
-                                onClick={() => adjustValue(setAttended, attended, 1)}
+                                onClick={increaseAttended}
                                 className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 flex items-center justify-center transition-colors"
-                                disabled={attended >= total}
                             >
                                 <Plus className="w-5 h-5" />
                             </button>
@@ -71,21 +94,19 @@ export function EditAttendance({ subject, isOpen, onClose, onSave }) {
                     {/* Total Classes */}
                     <div className="bg-secondary/30 rounded-xl p-4">
                         <label className="text-sm font-medium text-muted-foreground mb-3 block">
-                            Total Classes
+                            Total Classes <span className="text-xs text-blue-400">(add missed classes only)</span>
                         </label>
                         <div className="flex items-center justify-between gap-4">
                             <button
-                                onClick={() => {
-                                    adjustValue(setTotal, total, -1, attended);
-                                }}
-                                className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 flex items-center justify-center transition-colors"
-                                disabled={total <= attended || total <= 0}
+                                onClick={decreaseTotal}
+                                className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 flex items-center justify-center transition-colors disabled:opacity-30"
+                                disabled={total <= attended}
                             >
                                 <Minus className="w-5 h-5" />
                             </button>
                             <span className="text-4xl font-bold text-foreground">{total}</span>
                             <button
-                                onClick={() => adjustValue(setTotal, total, 1)}
+                                onClick={increaseTotal}
                                 className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 flex items-center justify-center transition-colors"
                             >
                                 <Plus className="w-5 h-5" />
