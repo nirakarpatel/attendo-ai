@@ -1,17 +1,25 @@
 import { useState } from "react";
-import { Plus, Minus, Trash2, Calendar, Pencil } from "lucide-react";
+import { Plus, Minus, Trash2, Calendar, Pencil, Clock } from "lucide-react";
 import { Card } from "./ui/Card";
 import { Button } from "./ui/Button";
 import { LeaveSimulator } from "./LeaveSimulator";
 import { EditAttendance } from "./EditAttendance";
+import { TimetableModal } from "./TimetableModal";
 import { calculateStatus } from "../lib/attendance-logic";
+import { storage } from "../services/storage";
 import { cn } from "../lib/utils";
 
 export function SubjectCard({ subject, onUpdate, onDelete }) {
     const [showSimulator, setShowSimulator] = useState(false);
     const [showEdit, setShowEdit] = useState(false);
+    const [showTimetable, setShowTimetable] = useState(false);
     const percentage = subject.total === 0 ? 100 : Math.round((subject.attended / subject.total) * 100);
     const status = calculateStatus(subject.total, subject.attended, subject.target);
+
+    // Get today's classes for this subject
+    const todayClasses = storage.getTimetable(subject.id).filter(
+        t => t.day === new Date().getDay()
+    );
 
     const handleAdd = (present) => {
         const updated = {
@@ -19,17 +27,19 @@ export function SubjectCard({ subject, onUpdate, onDelete }) {
             total: subject.total + 1,
             attended: subject.attended + (present ? 1 : 0)
         };
-        onUpdate(updated);
+        // Log attendance for calendar
+        storage.logAttendance(subject.id, present ? 'present' : 'absent');
+        onUpdate(updated, present);
     };
 
     const handleEditSave = (updatedSubject) => {
-        onUpdate(updatedSubject);
+        onUpdate(updatedSubject, false);
     };
 
     return (
         <>
             <Card className="relative overflow-hidden group">
-                {/* Background Gradient for flair */}
+                {/* Background Gradient */}
                 <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
 
                 <div className="flex justify-between items-start mb-4">
@@ -64,14 +74,33 @@ export function SubjectCard({ subject, onUpdate, onDelete }) {
                             {status.message}
                         </p>
                     </div>
-                    <button
-                        onClick={() => setShowEdit(true)}
-                        className="p-2 rounded-lg hover:bg-amber-500/10 text-muted-foreground hover:text-amber-400 transition-colors"
-                        title="Edit Attendance"
-                    >
-                        <Pencil className="w-4 h-4" />
-                    </button>
+                    <div className="flex gap-1">
+                        <button
+                            onClick={() => setShowTimetable(true)}
+                            className="p-2 rounded-lg hover:bg-blue-500/10 text-muted-foreground hover:text-blue-400 transition-colors"
+                            title="Set Schedule"
+                        >
+                            <Clock className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => setShowEdit(true)}
+                            className="p-2 rounded-lg hover:bg-amber-500/10 text-muted-foreground hover:text-amber-400 transition-colors"
+                            title="Edit Attendance"
+                        >
+                            <Pencil className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
+
+                {/* Today's schedule if any */}
+                {todayClasses.length > 0 && (
+                    <div className="mb-3 px-3 py-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                        <div className="flex items-center gap-2 text-xs text-blue-400">
+                            <Clock className="w-3 h-3" />
+                            <span>Today: {todayClasses.map(t => t.startTime).join(', ')}</span>
+                        </div>
+                    </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex gap-2 mb-3">
@@ -101,7 +130,7 @@ export function SubjectCard({ subject, onUpdate, onDelete }) {
                     Plan a Leave
                 </Button>
 
-                {/* Delete Subject Button - Always visible */}
+                {/* Delete Subject Button */}
                 <button
                     onClick={() => onDelete(subject.id)}
                     className="w-full mt-3 py-2 text-xs text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors flex items-center justify-center gap-2 border border-transparent hover:border-rose-500/20"
@@ -112,19 +141,24 @@ export function SubjectCard({ subject, onUpdate, onDelete }) {
                 </button>
             </Card>
 
-            {/* Leave Simulator Modal */}
+            {/* Modals */}
             <LeaveSimulator
                 subject={subject}
                 isOpen={showSimulator}
                 onClose={() => setShowSimulator(false)}
             />
 
-            {/* Edit Attendance Modal */}
             <EditAttendance
                 subject={subject}
                 isOpen={showEdit}
                 onClose={() => setShowEdit(false)}
                 onSave={handleEditSave}
+            />
+
+            <TimetableModal
+                subject={subject}
+                isOpen={showTimetable}
+                onClose={() => setShowTimetable(false)}
             />
         </>
     );

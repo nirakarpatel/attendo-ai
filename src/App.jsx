@@ -6,31 +6,41 @@ import { SubjectCard } from "./components/SubjectCard";
 import { AddSubjectModal } from "./components/AddSubjectModal";
 import { ProfileModal } from "./components/ProfileModal";
 import { DataBackup } from "./components/DataBackup";
+import { AttendanceCalendar } from "./components/AttendanceCalendar";
+import { HolidayManager } from "./components/HolidayManager";
+import { TodaySchedule } from "./components/TodaySchedule";
+import { ShareProgress } from "./components/ShareProgress";
+import { AlertBanner } from "./components/AlertBanner";
+import { NotificationSettings } from "./components/NotificationSettings";
+import { StreakBadge } from "./components/StreakBadge";
 import { Button } from "./components/ui/Button";
 import { storage } from "./services/storage";
 
 function App() {
   const [subjects, setSubjects] = useState([]);
   const [profile, setProfile] = useState(null);
+  const [streak, setStreak] = useState({ current: 0, longest: 0 });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isHolidaysOpen, setIsHolidaysOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Load data function (reusable)
   const loadData = () => {
     const data = storage.get();
     setSubjects(data.subjects);
     setProfile(data.profile);
+    setStreak(storage.getStreak());
   };
 
-  // Load data on mount
   useEffect(() => {
     loadData();
     setLoading(false);
   }, []);
 
-  // Show profile modal if no profile exists (first time user)
   useEffect(() => {
     if (!loading && !profile) {
       setIsProfileModalOpen(true);
@@ -47,9 +57,14 @@ function App() {
     setSubjects(updatedSubjects);
   };
 
-  const handleUpdateSubject = (updatedSubject) => {
+  const handleUpdateSubject = (updatedSubject, isPresent = false) => {
     const updatedSubjects = storage.updateSubject(updatedSubject);
     setSubjects(updatedSubjects);
+
+    if (isPresent) {
+      const result = storage.recordActivity();
+      setStreak(result.streak);
+    }
   };
 
   const handleDeleteSubject = (id) => {
@@ -60,7 +75,6 @@ function App() {
   };
 
   const handleDataImported = () => {
-    // Refresh all data after import
     loadData();
   };
 
@@ -70,7 +84,6 @@ function App() {
 
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center">Loading...</div>;
 
-  // Greeting based on time of day
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
@@ -80,11 +93,18 @@ function App() {
         profile={profile}
         onEditProfile={() => setIsProfileModalOpen(true)}
         onOpenBackup={() => setIsBackupModalOpen(true)}
+        onOpenCalendar={() => setIsCalendarOpen(true)}
+        onOpenHolidays={() => setIsHolidaysOpen(true)}
+        onOpenShare={() => setIsShareOpen(true)}
+        onOpenNotifications={() => setIsNotificationsOpen(true)}
       />
 
       <main className="container mx-auto px-4 pt-8 max-w-5xl">
+        {/* Alert Banners */}
+        <AlertBanner subjects={subjects} streak={streak} />
+
         {/* Welcome Section */}
-        <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-10 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-6 gap-4">
           <div>
             <h1 className="text-4xl font-bold mb-2">
               {profile ? `${greeting}, ${profile.name}!` : "My Attendance"}
@@ -92,13 +112,19 @@ function App() {
             <p className="text-muted-foreground">Track your progress and stay safe.</p>
           </div>
 
-          {subjects.length > 0 && (
-            <div className="glass px-6 py-3 rounded-2xl flex items-center gap-4">
-              <span className="text-sm font-medium text-muted-foreground">Overall Goal</span>
-              <span className="text-2xl font-bold text-primary">{overallPercentage}%</span>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <StreakBadge streak={streak} />
+            {subjects.length > 0 && (
+              <div className="glass px-6 py-3 rounded-2xl flex items-center gap-4">
+                <span className="text-sm font-medium text-muted-foreground">Overall</span>
+                <span className="text-2xl font-bold text-primary">{overallPercentage}%</span>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Today's Schedule */}
+        <TodaySchedule />
 
         {/* Subjects Grid */}
         {subjects.length === 0 ? (
@@ -120,7 +146,6 @@ function App() {
               />
             ))}
 
-            {/* Quick Add Button Card */}
             <button
               onClick={() => setIsModalOpen(true)}
               className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/10 rounded-2xl hover:border-primary/50 hover:bg-primary/5 transition-all group h-full min-h-[200px]"
@@ -134,6 +159,7 @@ function App() {
         )}
       </main>
 
+      {/* Modals */}
       <AddSubjectModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -151,6 +177,31 @@ function App() {
         isOpen={isBackupModalOpen}
         onClose={() => setIsBackupModalOpen(false)}
         onDataImported={handleDataImported}
+      />
+
+      <AttendanceCalendar
+        isOpen={isCalendarOpen}
+        onClose={() => setIsCalendarOpen(false)}
+        subjects={subjects}
+      />
+
+      <HolidayManager
+        isOpen={isHolidaysOpen}
+        onClose={() => setIsHolidaysOpen(false)}
+        onUpdate={loadData}
+      />
+
+      <ShareProgress
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        profile={profile}
+        subjects={subjects}
+        streak={streak}
+      />
+
+      <NotificationSettings
+        isOpen={isNotificationsOpen}
+        onClose={() => setIsNotificationsOpen(false)}
       />
 
       <Footer />
