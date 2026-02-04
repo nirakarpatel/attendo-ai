@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { Plus, Minus, Trash2, Calendar } from "lucide-react";
+import { Plus, Minus, Trash2, Calendar, Pencil } from "lucide-react";
 import { Card } from "./ui/Card";
 import { Button } from "./ui/Button";
 import { LeaveSimulator } from "./LeaveSimulator";
+import { EditAttendance } from "./EditAttendance";
 import { calculateStatus } from "../lib/attendance-logic";
 import { cn } from "../lib/utils";
 
 export function SubjectCard({ subject, onUpdate, onDelete }) {
     const [showSimulator, setShowSimulator] = useState(false);
+    const [showEdit, setShowEdit] = useState(false);
     const percentage = subject.total === 0 ? 100 : Math.round((subject.attended / subject.total) * 100);
     const status = calculateStatus(subject.total, subject.attended, subject.target);
 
@@ -18,6 +20,10 @@ export function SubjectCard({ subject, onUpdate, onDelete }) {
             attended: subject.attended + (present ? 1 : 0)
         };
         onUpdate(updated);
+    };
+
+    const handleEditSave = (updatedSubject) => {
+        onUpdate(updatedSubject);
     };
 
     return (
@@ -48,13 +54,23 @@ export function SubjectCard({ subject, onUpdate, onDelete }) {
                     />
                 </div>
 
-                <div className="mb-4">
-                    <p className="text-sm font-medium text-foreground/80 mb-1">
-                        {subject.attended} / {subject.total} Classes
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                        {status.message}
-                    </p>
+                {/* Stats with Edit Button */}
+                <div className="mb-4 flex items-center justify-between">
+                    <div>
+                        <p className="text-sm font-medium text-foreground/80 mb-1">
+                            {subject.attended} / {subject.total} Classes
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                            {status.message}
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => setShowEdit(true)}
+                        className="p-2 rounded-lg hover:bg-amber-500/10 text-muted-foreground hover:text-amber-400 transition-colors"
+                        title="Edit Attendance"
+                    >
+                        <Pencil className="w-4 h-4" />
+                    </button>
                 </div>
 
                 {/* Action Buttons */}
@@ -85,12 +101,14 @@ export function SubjectCard({ subject, onUpdate, onDelete }) {
                     Plan a Leave
                 </Button>
 
+                {/* Delete Subject Button - Always visible */}
                 <button
                     onClick={() => onDelete(subject.id)}
-                    className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-2"
+                    className="w-full mt-3 py-2 text-xs text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors flex items-center justify-center gap-2 border border-transparent hover:border-rose-500/20"
                     title="Delete Subject"
                 >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3 h-3" />
+                    Delete Subject
                 </button>
             </Card>
 
@@ -99,6 +117,14 @@ export function SubjectCard({ subject, onUpdate, onDelete }) {
                 subject={subject}
                 isOpen={showSimulator}
                 onClose={() => setShowSimulator(false)}
+            />
+
+            {/* Edit Attendance Modal */}
+            <EditAttendance
+                subject={subject}
+                isOpen={showEdit}
+                onClose={() => setShowEdit(false)}
+                onSave={handleEditSave}
             />
         </>
     );

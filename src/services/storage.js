@@ -1,13 +1,9 @@
 const STORAGE_KEY = 'attendance_app_data';
 
-// Initial Seed Data (Optional, for demo)
+// Initial Data (empty by default)
 const initialData = {
     profile: null, // { name, createdAt }
-    subjects: [
-        { id: '1', name: 'Mathematics', total: 20, attended: 16, target: 75 },
-        { id: '2', name: 'Computer Science', total: 18, attended: 18, target: 80 },
-        { id: '3', name: 'Physics', total: 22, attended: 14, target: 75 },
-    ],
+    subjects: [], // No default subjects
     log: [] // { id, subjectId, date, status: 'present' | 'absent' | 'cancelled' }
 };
 
