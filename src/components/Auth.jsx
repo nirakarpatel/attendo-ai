@@ -112,13 +112,13 @@ export function Auth() {
                         </div>
 
                         {!isResetPassword && <div>
-                            <div className="flex justify-between items-center mb-1">
+                            <div className="flex justify-between items-center mb-2">
                                 <label className="block text-sm font-medium text-muted-foreground">Password</label>
                                 {!isSignUp && (
                                     <button 
                                         type="button" 
                                         onClick={() => { setIsResetPassword(true); setError(null); setMessage(null); }}
-                                        className="text-xs text-primary hover:text-primary/80 transition-colors"
+                                        className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
                                     >
                                         Forgot Password?
                                     </button>
