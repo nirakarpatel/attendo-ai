@@ -1,64 +1,60 @@
 import { useState, useEffect } from "react";
-import { AlertTriangle, Flame, Bell, X, ChevronRight } from "lucide-react";
+import { AlertTriangle, Flame, Bell, X } from "lucide-react";
 import { notifications } from "../services/notifications";
-import { storage } from "../services/storage";
 
-export function AlertBanner({ subjects, streak, onNavigate }) {
-    const [alerts, setAlerts] = useState([]);
+export function AlertBanner({ subjects, streak }) {
     const [dismissed, setDismissed] = useState([]);
 
-    useEffect(() => {
-        const newAlerts = [];
-        const settings = notifications.getSettings();
+    const newAlerts = [];
+    const settings = notifications.getSettings();
 
-        // Daily reminder check
-        if (settings.dailyReminder && notifications.shouldShowDailyReminder()) {
-            // Check time - only show reminder after 10 AM
-            const hour = new Date().getHours();
-            if (hour >= 10) {
-                newAlerts.push({
-                    id: 'daily',
-                    type: 'info',
-                    icon: Bell,
-                    title: "Don't forget!",
-                    message: "Log your attendance for today",
-                    color: 'blue'
-                });
-            }
-        }
-
-        // Streak protection
-        if (settings.streakProtection && notifications.isStreakAtRisk(streak)) {
+    // Daily reminder check
+    if (settings.dailyReminder && notifications.shouldShowDailyReminder()) {
+        // Check time - only show reminder after 10 AM
+        const hour = new Date().getHours();
+        if (hour >= 10) {
             newAlerts.push({
-                id: 'streak',
-                type: 'warning',
-                icon: Flame,
-                title: `Protect your ${streak.current} day streak!`,
-                message: "Mark attendance today to keep it going",
-                color: 'orange'
+                id: 'daily',
+                type: 'info',
+                icon: Bell,
+                title: "Don't forget!",
+                message: "Log your attendance for today",
+                color: 'blue'
             });
         }
+    }
 
-        // Low attendance alert
-        if (settings.lowAttendanceAlert) {
-            const lowSubjects = notifications.getLowAttendanceSubjects(subjects);
-            if (lowSubjects.length > 0) {
-                const names = lowSubjects.slice(0, 2).map(s => s.name).join(', ');
-                const extra = lowSubjects.length > 2 ? ` +${lowSubjects.length - 2} more` : '';
-                newAlerts.push({
-                    id: 'low',
-                    type: 'danger',
-                    icon: AlertTriangle,
-                    title: "Low Attendance Alert",
-                    message: `${names}${extra} below target`,
-                    color: 'rose'
-                });
-            }
+    // Streak protection
+    if (settings.streakProtection && notifications.isStreakAtRisk(streak)) {
+        newAlerts.push({
+            id: 'streak',
+            type: 'warning',
+            icon: Flame,
+            title: `Protect your ${streak.current} day streak!`,
+            message: "Mark attendance today to keep it going",
+            color: 'orange'
+        });
+    }
+
+    // Low attendance alert
+    if (settings.lowAttendanceAlert) {
+        const lowSubjects = notifications.getLowAttendanceSubjects(subjects);
+        if (lowSubjects.length > 0) {
+            const names = lowSubjects.slice(0, 2).map(s => s.name).join(', ');
+            const extra = lowSubjects.length > 2 ? ` +${lowSubjects.length - 2} more` : '';
+            newAlerts.push({
+                id: 'low',
+                type: 'danger',
+                icon: AlertTriangle,
+                title: "Low Attendance Alert",
+                message: `${names}${extra} below target`,
+                color: 'rose'
+            });
         }
+    }
 
-        // Filter out dismissed alerts
-        setAlerts(newAlerts.filter(a => !dismissed.includes(a.id)));
-    }, [subjects, streak, dismissed]);
+    // Filter out dismissed alerts
+    const alerts = newAlerts.filter(a => !dismissed.includes(a.id));
 
     // Request notification permission on mount
     useEffect(() => {

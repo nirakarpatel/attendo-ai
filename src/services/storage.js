@@ -1,145 +1,183 @@
-const STORAGE_KEY = 'attendance_app_data';
+import { supabase } from '../lib/supabaseClient';
 
-// Initial Data (empty by default)
-const initialData = {
-    profile: null, // { name, createdAt }
-    subjects: [], // No default subjects
-    log: [], // Legacy log
-    streak: {
-        current: 0,
-        longest: 0,
-        lastActiveDate: null,
-        milestones: []
-    },
-    // NEW: Detailed attendance log per subject
-    attendanceLog: [], // { id, subjectId, date, status: 'present'|'absent' }
-    // NEW: Timetable for each subject
-    timetable: [], // { id, subjectId, day: 0-6, startTime: 'HH:MM', endTime: 'HH:MM' }
-    // NEW: Holidays list
-    holidays: [] // { id, date: 'YYYY-MM-DD', name: string }
+let currentUserId = null;
+
+export const setUserId = (id) => {
+    currentUserId = id;
+};
+
+const getUserId = () => {
+    if (!currentUserId) console.warn("storage.js: currentUserId is null. Did you forget to call setUserId?");
+    return currentUserId;
 };
 
 export const storage = {
-    get: () => {
+    // ============ MIGRATION ============
+    migrateData: async (oldId, newId) => {
+        if (!oldId || !newId || oldId === newId) return;
+        console.log("Migrating local device data to authenticated account...");
         try {
-            const data = localStorage.getItem(STORAGE_KEY);
-            const parsed = data ? JSON.parse(data) : initialData;
-            // Ensure new fields exist for backward compatibility
+            const { data: oldProfile } = await supabase.from('profiles').select('*').eq('id', oldId).single();
+            if (oldProfile) {
+                await supabase.from('profiles').upsert({ ...oldProfile, id: newId });
+            } else {
+                await supabase.from('profiles').upsert({ id: newId, name: 'Student' });
+            }
+
+            await Promise.all([
+                supabase.from('subjects').update({ user_id: newId }).eq('user_id', oldId),
+                supabase.from('attendance_logs').update({ user_id: newId }).eq('user_id', oldId),
+                supabase.from('timetable').update({ user_id: newId }).eq('user_id', oldId),
+                supabase.from('holidays').update({ user_id: newId }).eq('user_id', oldId)
+            ]);
+
+            if (oldProfile) {
+                await supabase.from('profiles').delete().eq('id', oldId);
+            }
+            console.log("Migration complete!");
+        } catch (e) {
+            console.error("Migration failed:", e);
+        }
+    },
+
+    // ============ INITIAL LOAD ============
+    // Replaces `get: () => ...`
+    loadAllData: async () => {
+        const userId = getUserId();
+        try {
+            const [
+                { data: profile },
+                { data: subjects },
+                { data: attendanceLog },
+                { data: timetable },
+                { data: holidays }
+            ] = await Promise.all([
+                supabase.from('profiles').select('*').eq('id', userId).single(),
+                supabase.from('subjects').select('*').eq('user_id', userId),
+                supabase.from('attendance_logs').select('*').eq('user_id', userId),
+                supabase.from('timetable').select('*').eq('user_id', userId),
+                supabase.from('holidays').select('*').eq('user_id', userId)
+            ]);
+
             return {
-                ...initialData,
-                ...parsed,
-                attendanceLog: parsed.attendanceLog || [],
-                timetable: parsed.timetable || [],
-                holidays: parsed.holidays || []
+                profile: profile || null,
+                subjects: subjects || [],
+                attendanceLog: attendanceLog || [],
+                timetable: timetable || [],
+                holidays: holidays || [],
+                streak: profile ? {
+                    current: profile.streak_current || 0,
+                    longest: profile.streak_longest || 0,
+                    lastActiveDate: profile.streak_last_active_date || null,
+                    milestones: profile.milestones || []
+                } : { current: 0, longest: 0, lastActiveDate: null, milestones: [] }
             };
         } catch (e) {
-            console.error("Storage Error", e);
-            return initialData;
+            console.error("Failed to load data from Supabase", e);
+            return {
+                profile: null,
+                subjects: [],
+                attendanceLog: [],
+                timetable: [],
+                holidays: [],
+                streak: { current: 0, longest: 0, lastActiveDate: null, milestones: [] }
+            };
         }
     },
 
-    save: (data) => {
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        } catch (e) {
-            console.error("Storage Save Error", e);
-        }
+    // ============ SUBJECT METHODS ============
+    getSubjects: async () => {
+        const { data, error } = await supabase
+            .from('subjects')
+            .select('*')
+            .eq('user_id', getUserId());
+        return error ? [] : data;
     },
 
-    updateSubject: (updatedSubject) => {
-        const data = storage.get();
-        const newSubjects = data.subjects.map(s => s.id === updatedSubject.id ? updatedSubject : s);
-        storage.save({ ...data, subjects: newSubjects });
-        return newSubjects;
+    addSubject: async (name, target = 75) => {
+        const { data, error } = await supabase
+            .from('subjects')
+            .insert([{ user_id: getUserId(), name, target_percentage: target }])
+            .select()
+            .single();
+        
+        if (error) console.error("Error adding subject", error);
+        return data ? [data] : []; // Returning as array for backwards compatibility in components, though we might need to fetch all
     },
 
-    addSubject: (name, target = 75) => {
-        const data = storage.get();
-        const newSubject = {
-            id: Date.now().toString(),
-            name,
-            total: 0,
-            attended: 0,
-            target
-        };
-        const newSubjects = [...data.subjects, newSubject];
-        storage.save({ ...data, subjects: newSubjects });
-        return newSubjects;
+    updateSubject: async (updatedSubject) => {
+        const { data, error } = await supabase
+            .from('subjects')
+            .update({ name: updatedSubject.name, target_percentage: updatedSubject.target_percentage }) // Note: attended/total are now derived
+            .eq('id', updatedSubject.id)
+            .eq('user_id', getUserId())
+            .select();
+        if (error) console.error("Error updating subject", error);
+        return data; 
     },
 
-    deleteSubject: (id) => {
-        const data = storage.get();
-        const newSubjects = data.subjects.filter(s => s.id !== id);
-        // Also delete related timetable entries
-        const newTimetable = data.timetable.filter(t => t.subjectId !== id);
-        // Also delete related attendance logs
-        const newAttendanceLog = data.attendanceLog.filter(a => a.subjectId !== id);
-        storage.save({ ...data, subjects: newSubjects, timetable: newTimetable, attendanceLog: newAttendanceLog });
-        return newSubjects;
+    deleteSubject: async (id) => {
+         // Supabase cascade delete will handle timetable and logs
+        const { error } = await supabase
+            .from('subjects')
+            .delete()
+            .eq('id', id)
+            .eq('user_id', getUserId());
+        if (error) console.error("Error deleting subject", error);
     },
 
-    // Profile methods
-    getProfile: () => {
-        const data = storage.get();
-        return data.profile || null;
+    // ============ PROFILE METHODS ============
+    getProfile: async () => {
+         const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', getUserId())
+            .single();
+        return data || null;
     },
 
-    setProfile: (name) => {
-        const data = storage.get();
-        const profile = {
-            name: name.trim(),
-            createdAt: new Date().toISOString()
-        };
-        storage.save({ ...data, profile });
-        return profile;
+    setProfile: async (name) => {
+        const userId = getUserId();
+        const { data, error } = await supabase
+            .from('profiles')
+            .upsert({ id: userId, name: name.trim() })
+            .select()
+            .single();
+        if (error) console.error("Error setting profile", error);
+        return data;
     },
 
-    clearProfile: () => {
-        const data = storage.get();
-        storage.save({ ...data, profile: null });
-    },
-
-    // Export/Import
-    exportData: () => {
-        const data = storage.get();
-        return JSON.stringify(data, null, 2);
-    },
-
-    importData: (jsonString) => {
-        try {
-            const data = JSON.parse(jsonString);
-            if (data && typeof data === 'object') {
-                storage.save(data);
-                return { success: true, data };
-            }
-            return { success: false, error: "Invalid data format" };
-        } catch (e) {
-            return { success: false, error: "Invalid JSON file" };
-        }
-    },
-
-    clearAll: () => {
-        localStorage.removeItem(STORAGE_KEY);
+     clearProfile: async () => {
+        const { error } = await supabase
+             .from('profiles')
+             .delete()
+             .eq('id', getUserId());
+        if (error) console.error("Error clearing profile", error);
     },
 
     // ============ STREAK METHODS ============
-    getStreak: () => {
-        const data = storage.get();
-        return data.streak || { current: 0, longest: 0, lastActiveDate: null, milestones: [] };
+    getStreak: async () => {
+        const profile = await storage.getProfile();
+        return profile ? {
+            current: profile.streak_current || 0,
+            longest: profile.streak_longest || 0,
+            lastActiveDate: profile.streak_last_active_date || null,
+            milestones: profile.milestones || []
+        } : { current: 0, longest: 0, lastActiveDate: null, milestones: [] };
     },
 
-    recordActivity: () => {
-        const data = storage.get();
-        const streak = data.streak || { current: 0, longest: 0, lastActiveDate: null, milestones: [] };
+    recordActivity: async () => {
+        const userId = getUserId();
+        const streak = await storage.getStreak();
         const today = new Date().toISOString().split('T')[0];
 
         if (streak.lastActiveDate === today) {
             return { streak, newMilestone: null };
         }
 
-        // Check holidays - if yesterday was holiday, consider streak continued
-        const holidays = data.holidays || [];
-        const holidayDates = holidays.map(h => h.date);
+        // Check holidays
+        const { data: holidays } = await supabase.from('holidays').select('date').eq('user_id', userId);
+        const holidayDates = (holidays || []).map(h => h.date);
 
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
@@ -160,139 +198,121 @@ export const storage = {
         }
 
         const newStreak = {
-            current: newCurrent,
-            longest: newLongest,
-            lastActiveDate: today,
+            streak_current: newCurrent,
+            streak_longest: newLongest,
+            streak_last_active_date: today,
             milestones: streak.milestones
         };
 
-        storage.save({ ...data, streak: newStreak });
-        return { streak: newStreak, newMilestone };
+        await supabase.from('profiles').upsert({ id: userId, ...newStreak });
+
+        return { 
+            streak: { current: newCurrent, longest: newLongest, lastActiveDate: today, milestones: streak.milestones }, 
+            newMilestone 
+        };
     },
 
     // ============ ATTENDANCE LOG METHODS ============
-    logAttendance: (subjectId, status) => {
-        const data = storage.get();
-        const today = new Date().toISOString().split('T')[0];
+    logAttendance: async (subjectId, status) => {
+        const userId = getUserId();
+        const date = new Date().toISOString().split('T')[0];
 
-        // Check if already logged today for this subject
-        const existing = data.attendanceLog.find(
-            a => a.subjectId === subjectId && a.date === today
-        );
-
-        if (existing) {
-            // Update existing entry
-            existing.status = status;
-            storage.save(data);
-        } else {
-            // Add new entry
-            const newEntry = {
-                id: Date.now().toString(),
-                subjectId,
-                date: today,
-                status
-            };
-            data.attendanceLog.push(newEntry);
-            storage.save(data);
-        }
-        return data.attendanceLog;
+        const { data, error } = await supabase
+            .from('attendance_logs')
+            .upsert({ 
+                user_id: userId, 
+                subject_id: subjectId, 
+                date, 
+                status 
+            }, { onConflict: 'subject_id, date' }) // Requires unique constraint
+            .select();
+        
+        if (error) console.error("Error logging attendance", error);
+        return data;
     },
 
-    getAttendanceLog: (subjectId = null, month = null, year = null) => {
-        const data = storage.get();
-        let logs = data.attendanceLog || [];
-
+    getAttendanceLog: async (subjectId = null, month = null, year = null) => {
+        let query = supabase.from('attendance_logs').select('*').eq('user_id', getUserId());
+        
         if (subjectId) {
-            logs = logs.filter(a => a.subjectId === subjectId);
+            query = query.eq('subject_id', subjectId);
         }
+        
+        const { data, error } = await query;
+        if (error) return [];
 
+        let logs = data || [];
         if (month !== null && year !== null) {
             logs = logs.filter(a => {
                 const d = new Date(a.date);
                 return d.getMonth() === month && d.getFullYear() === year;
             });
         }
-
         return logs;
     },
 
     // ============ TIMETABLE METHODS ============
-    getTimetable: (subjectId = null) => {
-        const data = storage.get();
-        const timetable = data.timetable || [];
-        if (subjectId) {
-            return timetable.filter(t => t.subjectId === subjectId);
-        }
-        return timetable;
+    getTimetable: async (subjectId = null) => {
+        let query = supabase.from('timetable').select('*').eq('user_id', getUserId());
+        if (subjectId) query = query.eq('subject_id', subjectId);
+        
+        const { data, error } = await query;
+        return error ? [] : (data || []);
     },
 
-    addTimetableEntry: (subjectId, day, startTime, endTime) => {
-        const data = storage.get();
-        const newEntry = {
-            id: Date.now().toString(),
-            subjectId,
-            day, // 0 = Sunday, 1 = Monday, ...
-            startTime,
-            endTime
-        };
-        data.timetable.push(newEntry);
-        storage.save(data);
-        return data.timetable;
+    addTimetableEntry: async (subjectId, day, startTime, endTime) => {
+        const { data, error } = await supabase
+            .from('timetable')
+            .insert([{ user_id: getUserId(), subject_id: subjectId, day_of_week: day, start_time: startTime, end_time: endTime }])
+            .select();
+        if (error) console.error("Error adding timetable entry", error);
+        return data || [];
     },
 
-    deleteTimetableEntry: (id) => {
-        const data = storage.get();
-        data.timetable = data.timetable.filter(t => t.id !== id);
-        storage.save(data);
-        return data.timetable;
+    deleteTimetableEntry: async (id) => {
+        const { error } = await supabase.from('timetable').delete().eq('id', id).eq('user_id', getUserId());
+        if (error) console.error("Error deleting timetable entry", error);
     },
 
-    getTodaySchedule: () => {
-        const data = storage.get();
-        const today = new Date().getDay(); // 0-6
-        const timetable = data.timetable || [];
-        const subjects = data.subjects || [];
+    getTodaySchedule: async () => {
+         const userId = getUserId();
+         const today = new Date().getDay();
 
-        const todayClasses = timetable
-            .filter(t => t.day === today)
-            .map(t => ({
-                ...t,
-                subject: subjects.find(s => s.id === t.subjectId)
-            }))
-            .filter(t => t.subject)
-            .sort((a, b) => a.startTime.localeCompare(b.startTime));
+         const [ { data: timetable }, { data: subjects } ] = await Promise.all([
+             supabase.from('timetable').select('*').eq('user_id', userId).eq('day_of_week', today),
+             supabase.from('subjects').select('*').eq('user_id', userId)
+         ]);
 
-        return todayClasses;
+         if (!timetable || !subjects) return [];
+
+         return timetable.map(t => ({
+             ...t,
+             subject: subjects.find(s => s.id === t.subject_id)
+         })).filter(t => t.subject).sort((a, b) => a.start_time.localeCompare(b.start_time));
     },
 
     // ============ HOLIDAY METHODS ============
-    getHolidays: () => {
-        const data = storage.get();
-        return data.holidays || [];
+    getHolidays: async () => {
+        const { data, error } = await supabase.from('holidays').select('*').eq('user_id', getUserId());
+        return error ? [] : (data || []);
     },
 
-    addHoliday: (date, name) => {
-        const data = storage.get();
-        const newHoliday = {
-            id: Date.now().toString(),
-            date,
-            name
-        };
-        data.holidays.push(newHoliday);
-        storage.save(data);
-        return data.holidays;
+    addHoliday: async (date, name) => {
+        const { data, error } = await supabase
+            .from('holidays')
+            .insert([{ user_id: getUserId(), date, name }])
+            .select();
+        if (error) console.error("Error adding holiday", error);
+        return data || [];
     },
 
-    deleteHoliday: (id) => {
-        const data = storage.get();
-        data.holidays = data.holidays.filter(h => h.id !== id);
-        storage.save(data);
-        return data.holidays;
+    deleteHoliday: async (id) => {
+        const { error } = await supabase.from('holidays').delete().eq('id', id).eq('user_id', getUserId());
+        if (error) console.error("Error deleting holiday", error);
     },
 
-    isHoliday: (date) => {
-        const data = storage.get();
-        const holidays = data.holidays || [];
-        return holidays.some(h => h.date === date);
+    isHoliday: async (date) => {
+        const { data } = await supabase.from('holidays').select('id').eq('user_id', getUserId()).eq('date', date);
+        return data && data.length > 0;
     }
 };

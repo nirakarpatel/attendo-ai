@@ -4,15 +4,16 @@ import { Card } from "./ui/Card";
 import { Button } from "./ui/Button";
 import { storage } from "../services/storage";
 
-export function DataBackup({ isOpen, onClose, onDataImported }) {
+export function DataBackup({ isOpen, onClose }) {
     const [status, setStatus] = useState(null); // { type: 'success' | 'error', message: string }
     const fileInputRef = useRef(null);
 
     if (!isOpen) return null;
 
-    const handleExport = () => {
-        const data = storage.exportData();
-        const blob = new Blob([data], { type: 'application/json' });
+    const handleExport = async () => {
+        const data = await storage.loadAllData();
+        const jsonStr = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -29,16 +30,19 @@ export function DataBackup({ isOpen, onClose, onDataImported }) {
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (e) => {
-            const result = storage.importData(e.target?.result);
-            if (result.success) {
-                setStatus({ type: 'success', message: 'Data restored successfully! Refreshing...' });
-                setTimeout(() => {
-                    onDataImported();
-                    onClose();
-                }, 1500);
-            } else {
-                setStatus({ type: 'error', message: result.error });
+        reader.onload = async (e) => {
+            try {
+                const data = JSON.parse(e.target?.result);
+                if (data && typeof data === 'object') {
+                    // We don't have a reliable way to bulk-import into Supabase from this client
+                    // without writing a complex sync function right now.
+                    // For now, let's just show an error if they try to import local JSON to Supabase
+                    setStatus({ type: 'error', message: "Importing local JSON direct to Cloud DB is currently unsupported." });
+                } else {
+                     setStatus({ type: 'error', message: "Invalid data format" });
+                }
+            } catch {
+                setStatus({ type: 'error', message: "Invalid JSON file" });
             }
         };
         reader.readAsText(file);

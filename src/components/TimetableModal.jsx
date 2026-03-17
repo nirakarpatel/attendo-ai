@@ -14,21 +14,24 @@ export function TimetableModal({ isOpen, onClose, subject }) {
 
     useEffect(() => {
         if (isOpen && subject) {
-            setEntries(storage.getTimetable(subject.id));
+            storage.getTimetable(subject.id).then(setEntries);
         }
     }, [isOpen, subject]);
 
     if (!isOpen || !subject) return null;
 
-    const handleAdd = (e) => {
+    const handleAdd = async (e) => {
         e.preventDefault();
-        const updated = storage.addTimetableEntry(subject.id, newDay, newStartTime, newEndTime);
-        setEntries(updated.filter(t => t.subjectId === subject.id));
+        await storage.addTimetableEntry(subject.id, newDay, newStartTime, newEndTime);
+        // Supabase returns the inserted row, so fetch the full list again to update state properly
+        const fullTimetable = await storage.getTimetable(subject.id);
+        setEntries(fullTimetable);
     };
 
-    const handleDelete = (id) => {
-        const updated = storage.deleteTimetableEntry(id);
-        setEntries(updated.filter(t => t.subjectId === subject.id));
+    const handleDelete = async (id) => {
+        await storage.deleteTimetableEntry(id);
+        const fullTimetable = await storage.getTimetable(subject.id);
+        setEntries(fullTimetable);
     };
 
     // Sort by day then time

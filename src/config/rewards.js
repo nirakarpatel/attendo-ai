@@ -51,7 +51,7 @@ export const BRAND_REWARDS = [
         logo: "🎧",
         title: "Audible Premium Plus",
         description: "2 Months Free Trial",
-        coupon: "AUDIBLE-ATTENDO-2M",
+        coupon: "JAUD2MFT",
         requiredDays: 30,
         color: "from-orange-500/20 to-red-500/20",
         borderColor: "border-orange-500/30"

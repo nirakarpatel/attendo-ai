@@ -1,20 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar, X, Plus, Trash2 } from "lucide-react";
 import { Card } from "./ui/Card";
 import { Button } from "./ui/Button";
 import { storage } from "../services/storage";
 
 export function HolidayManager({ isOpen, onClose, onUpdate }) {
-    const [holidays, setHolidays] = useState(storage.getHolidays());
+    const [holidays, setHolidays] = useState([]);
     const [newDate, setNewDate] = useState("");
     const [newName, setNewName] = useState("");
+    
+    useEffect(() => {
+        if (isOpen) {
+            storage.getHolidays().then(setHolidays);
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
-    const handleAdd = (e) => {
+    const handleAdd = async (e) => {
         e.preventDefault();
         if (newDate && newName.trim()) {
-            const updated = storage.addHoliday(newDate, newName.trim());
+            const updated = await storage.addHoliday(newDate, newName.trim());
             setHolidays(updated);
             setNewDate("");
             setNewName("");
@@ -22,8 +28,9 @@ export function HolidayManager({ isOpen, onClose, onUpdate }) {
         }
     };
 
-    const handleDelete = (id) => {
-        const updated = storage.deleteHoliday(id);
+    const handleDelete = async (id) => {
+        await storage.deleteHoliday(id);
+        const updated = await storage.getHolidays();
         setHolidays(updated);
         onUpdate?.();
     };

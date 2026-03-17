@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Bell, BellOff, X } from "lucide-react";
 import { Card } from "./ui/Card";
 import { Button } from "./ui/Button";
@@ -8,12 +8,14 @@ export function NotificationSettings({ isOpen, onClose }) {
     const [settings, setSettings] = useState(notifications.getSettings());
     const [permission, setPermission] = useState(notifications.getPermission());
 
-    useEffect(() => {
-        if (isOpen) {
-            setSettings(notifications.getSettings());
-            setPermission(notifications.getPermission());
-        }
-    }, [isOpen]);
+    const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+    if (isOpen && !prevIsOpen) {
+        setSettings(notifications.getSettings());
+        setPermission(notifications.getPermission());
+    }
+    if (isOpen !== prevIsOpen) {
+        setPrevIsOpen(isOpen);
+    }
 
     if (!isOpen) return null;
 

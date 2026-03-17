@@ -1,6 +1,6 @@
-import { GraduationCap, User, Shield, CalendarDays, Umbrella, Share2, Bell } from "lucide-react";
+import { GraduationCap, User, Shield, CalendarDays, Umbrella, Share2, Bell, LogOut } from "lucide-react";
 
-export function Header({ profile, onEditProfile, onOpenBackup, onOpenCalendar, onOpenHolidays, onOpenShare, onOpenNotifications }) {
+export function Header({ profile, onEditProfile, onOpenBackup, onOpenCalendar, onOpenHolidays, onOpenShare, onOpenNotifications, onSignOut }) {
     return (
         <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-background/80 backdrop-blur-xl">
             <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -78,6 +78,15 @@ export function Header({ profile, onEditProfile, onOpenBackup, onOpenCalendar, o
                                 {profile.name}
                             </span>
                         )}
+                    </button>
+
+                    {/* Sign Out Button */}
+                    <button
+                        onClick={onSignOut}
+                        className="p-2 ml-1 rounded-xl hover:bg-rose-500/10 transition-colors text-muted-foreground hover:text-rose-400"
+                        title="Sign Out"
+                    >
+                        <LogOut className="w-5 h-5" />
                     </button>
                 </div>
             </div>

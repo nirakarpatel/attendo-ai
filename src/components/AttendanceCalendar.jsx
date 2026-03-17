@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Card } from "./ui/Card";
 import { Button } from "./ui/Button";
@@ -11,22 +11,30 @@ const MONTHS = ["January", "February", "March", "April", "May", "June",
 export function AttendanceCalendar({ isOpen, onClose, subjects }) {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedSubject, setSelectedSubject] = useState("all");
-
-    if (!isOpen) return null;
+    const [attendanceLog, setAttendanceLog] = useState([]);
+    const [holidayDates, setHolidayDates] = useState([]);
 
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
 
-    // Get attendance log for this month
-    const attendanceLog = storage.getAttendanceLog(
-        selectedSubject === "all" ? null : selectedSubject,
-        month,
-        year
-    );
+    useEffect(() => {
+        if (!isOpen) return;
+        const fetchData = async () => {
+             const [logs, hols] = await Promise.all([
+                 storage.getAttendanceLog(
+                     selectedSubject === "all" ? null : selectedSubject,
+                     month,
+                     year
+                 ),
+                 storage.getHolidays()
+             ]);
+             setAttendanceLog(logs);
+             setHolidayDates(hols.map(h => h.date));
+        };
+        fetchData();
+    }, [isOpen, selectedSubject, month, year]);
 
-    // Get holidays
-    const holidays = storage.getHolidays();
-    const holidayDates = holidays.map(h => h.date);
+    if (!isOpen) return null;
 
     // Build calendar grid
     const firstDay = new Date(year, month, 1).getDay();

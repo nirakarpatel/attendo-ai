@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Pencil, X, Plus, Minus, Target } from "lucide-react";
 import { Card } from "./ui/Card";
 import { Button } from "./ui/Button";
@@ -7,15 +7,26 @@ export function EditAttendance({ subject, isOpen, onClose, onSave }) {
     const [attended, setAttended] = useState(subject.attended);
     const [total, setTotal] = useState(subject.total);
     const [target, setTarget] = useState(subject.target);
+    const [prevSubjectId, setPrevSubjectId] = useState(subject.id);
 
-    // Reset values when modal opens or subject changes
-    useEffect(() => {
-        if (isOpen) {
-            setAttended(subject.attended);
-            setTotal(subject.total);
-            setTarget(subject.target);
-        }
-    }, [isOpen, subject.attended, subject.total, subject.target]);
+    // Reset values when subject changes (Derived State Pattern)
+    if (subject.id !== prevSubjectId) {
+        setAttended(subject.attended);
+        setTotal(subject.total);
+        setTarget(subject.target);
+        setPrevSubjectId(subject.id);
+    }
+
+    // Reset values when modal opens (if it was closed before and re-opened)
+    const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+    if (isOpen && !prevIsOpen) {
+        setAttended(subject.attended);
+        setTotal(subject.total);
+        setTarget(subject.target);
+    }
+    if (isOpen !== prevIsOpen) {
+        setPrevIsOpen(isOpen);
+    }
 
     if (!isOpen) return null;
 

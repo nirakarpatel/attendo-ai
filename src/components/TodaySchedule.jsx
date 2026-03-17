@@ -1,8 +1,18 @@
 import { Clock, BookOpen } from "lucide-react";
+import { useEffect, useState } from "react";
 import { storage } from "../services/storage";
 
 export function TodaySchedule() {
-    const schedule = storage.getTodaySchedule();
+    const [schedule, setSchedule] = useState([]);
+    
+    useEffect(() => {
+        const fetchSchedule = async () => {
+            const data = await storage.getTodaySchedule();
+            setSchedule(data);
+        };
+        fetchSchedule();
+    }, []);
+
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const today = days[new Date().getDay()];
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Minus, Trash2, Calendar, Pencil, Clock } from "lucide-react";
 import { Card } from "./ui/Card";
 import { Button } from "./ui/Button";
@@ -13,22 +13,28 @@ export function SubjectCard({ subject, onUpdate, onDelete }) {
     const [showSimulator, setShowSimulator] = useState(false);
     const [showEdit, setShowEdit] = useState(false);
     const [showTimetable, setShowTimetable] = useState(false);
+    const [todayClasses, setTodayClasses] = useState([]);
+    
     const percentage = subject.total === 0 ? 100 : Math.round((subject.attended / subject.total) * 100);
     const status = calculateStatus(subject.total, subject.attended, subject.target);
 
-    // Get today's classes for this subject
-    const todayClasses = storage.getTimetable(subject.id).filter(
-        t => t.day === new Date().getDay()
-    );
+    // Get today's classes for this subject asynchronously
+    useEffect(() => {
+        const fetchTimetable = async () => {
+             const _timetable = await storage.getTimetable(subject.id);
+             setTodayClasses(_timetable.filter(t => t.day_of_week === new Date().getDay()));
+        };
+        fetchTimetable();
+    }, [subject.id]);
 
-    const handleAdd = (present) => {
+    const handleAdd = async (present) => {
         const updated = {
             ...subject,
             total: subject.total + 1,
             attended: subject.attended + (present ? 1 : 0)
         };
         // Log attendance for calendar
-        storage.logAttendance(subject.id, present ? 'present' : 'absent');
+        await storage.logAttendance(subject.id, present ? 'present' : 'absent');
         onUpdate(updated, present);
     };
 
