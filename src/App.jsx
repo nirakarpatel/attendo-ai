@@ -21,6 +21,7 @@ import { Auth } from "./components/Auth";
 function App() {
   const [session, setSession] = useState(null);
   const [isSessionLoading, setIsSessionLoading] = useState(true);
+  const [isResetMode, setIsResetMode] = useState(false);
 
   const [subjects, setSubjects] = useState([]);
   const [profile, setProfile] = useState(null);
@@ -50,7 +51,10 @@ function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsResetMode(true);
+      }
       handleSession(session);
     });
 
@@ -131,8 +135,8 @@ function App() {
     <span className="text-muted-foreground font-medium">Loading Attendance...</span>
   </div>;
 
-  if (!session) {
-    return <Auth />;
+  if (!session || isResetMode) {
+    return <Auth forceResetMode={isResetMode} onPasswordUpdated={() => setIsResetMode(false)} />;
   }
 
   const hour = new Date().getHours();

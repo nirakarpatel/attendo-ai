@@ -4,10 +4,11 @@ import { Card } from "./ui/Card";
 import { Button } from "./ui/Button";
 import { supabase } from "../lib/supabaseClient";
 
-export function Auth() {
+export function Auth({ forceResetMode, onPasswordUpdated }) {
     const [isLoading, setIsLoading] = useState(false);
     const [isSignUp, setIsSignUp] = useState(false);
     const [isResetPassword, setIsResetPassword] = useState(false);
+    const [isUpdatePassword, setIsUpdatePassword] = useState(forceResetMode || false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState(null);
@@ -20,9 +21,17 @@ export function Auth() {
         setMessage(null);
 
         try {
-            if (isResetPassword) {
+            if (isUpdatePassword) {
+                const { error } = await supabase.auth.updateUser({
+                    password: password
+                });
+                if (error) throw error;
+                setMessage('Success! Your password has been updated.');
+                setIsUpdatePassword(false);
+                if (onPasswordUpdated) onPasswordUpdated();
+            } else if (isResetPassword) {
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                    redirectTo: window.location.origin
+                    redirectTo: 'https://attendoai.netlify.app/'
                 });
                 if (error) throw error;
                 setMessage('Success! Check your email for a password reset link.');
@@ -72,10 +81,10 @@ export function Auth() {
                         <Key className="w-8 h-8 text-primary" />
                     </div>
                     <h2 className="text-3xl font-extrabold text-foreground tracking-tight">
-                        {isResetPassword ? 'Reset Password' : isSignUp ? 'Create your account' : 'Welcome to Attendo'}
+                        {isUpdatePassword ? 'Set New Password' : isResetPassword ? 'Reset Password' : isSignUp ? 'Create your account' : 'Welcome to Attendo'}
                     </h2>
                     <p className="text-muted-foreground mt-2">
-                        {isResetPassword ? 'Enter your email to receive a reset link' : isSignUp ? 'Sign up to sync your attendance everywhere' : 'Sign in to access your attendance data'}
+                        {isUpdatePassword ? 'Enter your new password below' : isResetPassword ? 'Enter your email to receive a reset link' : isSignUp ? 'Sign up to sync your attendance everywhere' : 'Sign in to access your attendance data'}
                     </p>
                 </div>
 
@@ -94,51 +103,57 @@ export function Auth() {
                     )}
 
                     <form onSubmit={handleEmailAuth} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-muted-foreground mb-1">Email</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Mail className="h-5 w-5 text-muted-foreground" />
+                        {!isUpdatePassword && (
+                            <div>
+                                <label className="block text-sm font-medium text-muted-foreground mb-1">Email</label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <Mail className="h-5 w-5 text-muted-foreground" />
+                                    </div>
+                                    <input
+                                        type="email"
+                                        required
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="block w-full pl-10 pr-3 py-2 border border-white/10 rounded-xl bg-secondary/50 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                        placeholder="your@email.com"
+                                    />
                                 </div>
-                                <input
-                                    type="email"
-                                    required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="block w-full pl-10 pr-3 py-2 border border-white/10 rounded-xl bg-secondary/50 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                                    placeholder="your@email.com"
-                                />
                             </div>
-                        </div>
+                        )}
 
-                        {!isResetPassword && <div>
-                            <div className="flex justify-between items-center mb-2">
-                                <label className="block text-sm font-medium text-muted-foreground">Password</label>
-                                {!isSignUp && (
-                                    <button 
-                                        type="button" 
-                                        onClick={() => { setIsResetPassword(true); setError(null); setMessage(null); }}
-                                        className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
-                                    >
-                                        Forgot Password?
-                                    </button>
-                                )}
-                            </div>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Key className="h-5 w-5 text-muted-foreground" />
+                        {(isUpdatePassword || !isResetPassword) && (
+                            <div>
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className="block text-sm font-medium text-muted-foreground">
+                                        {isUpdatePassword ? 'New Password' : 'Password'}
+                                    </label>
+                                    {!isSignUp && !isUpdatePassword && (
+                                        <button 
+                                            type="button" 
+                                            onClick={() => { setIsResetPassword(true); setError(null); setMessage(null); }}
+                                            className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                                        >
+                                            Forgot Password?
+                                        </button>
+                                    )}
                                 </div>
-                                <input
-                                    type="password"
-                                    required={!isResetPassword}
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="block w-full pl-10 pr-3 py-2 border border-white/10 rounded-xl bg-secondary/50 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                                    placeholder="••••••••"
-                                    minLength={6}
-                                />
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <Key className="h-5 w-5 text-muted-foreground" />
+                                    </div>
+                                    <input
+                                        type="password"
+                                        required={isUpdatePassword || !isResetPassword}
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="block w-full pl-10 pr-3 py-2 border border-white/10 rounded-xl bg-secondary/50 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                        placeholder="••••••••"
+                                        minLength={6}
+                                    />
+                                </div>
                             </div>
-                        </div>}
+                        )}
 
                         <Button
                             type="submit"
@@ -146,11 +161,11 @@ export function Auth() {
                             disabled={isLoading}
                         >
                             {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
-                            {isResetPassword ? 'Send Reset Link' : isSignUp ? 'Sign Up' : 'Sign In'}
+                            {isUpdatePassword ? 'Update Password' : isResetPassword ? 'Send Reset Link' : isSignUp ? 'Sign Up' : 'Sign In'}
                         </Button>
                     </form>
 
-                    {!isResetPassword && <>
+                    {!isResetPassword && !isUpdatePassword && <>
                         <div className="mt-6 flex items-center justify-center">
                             <div className="border-t border-white/10 flex-grow"></div>
                             <span className="px-3 text-xs text-muted-foreground uppercase font-medium">Or continue with</span>
@@ -169,7 +184,7 @@ export function Auth() {
                                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
                                     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                                 </svg>
                                 Google
                             </Button>
@@ -178,7 +193,14 @@ export function Auth() {
                 </Card>
 
                 <div className="text-center text-sm text-muted-foreground mt-4">
-                    {isResetPassword ? (
+                    {isUpdatePassword ? (
+                         <button
+                            onClick={() => { setIsUpdatePassword(false); if (onPasswordUpdated) onPasswordUpdated(); setError(null); setMessage(null); }}
+                            className="text-primary hover:text-primary/80 font-medium hover:underline transition-all"
+                        >
+                            Cancel and go back
+                        </button>
+                    ) : isResetPassword ? (
                         <button
                             onClick={() => { setIsResetPassword(false); setError(null); setMessage(null); }}
                             className="text-primary hover:text-primary/80 font-medium hover:underline transition-all"
