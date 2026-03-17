@@ -1,4 +1,5 @@
-import { GraduationCap, User, Shield, CalendarDays, Umbrella, Share2, Bell, LogOut } from "lucide-react";
+import { GraduationCap, User, Shield, CalendarDays, Umbrella, Share2, Bell, LogOut, Key } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export function Header({ profile, onEditProfile, onOpenBackup, onOpenCalendar, onOpenHolidays, onOpenShare, onOpenNotifications, onSignOut }) {
     return (
@@ -58,6 +59,15 @@ export function Header({ profile, onEditProfile, onOpenBackup, onOpenCalendar, o
                     >
                         <Shield className="w-5 h-5" />
                     </button>
+
+                    {/* Change Password Button */}
+                    <Link
+                        to="/change-password"
+                        className="p-2 rounded-xl hover:bg-secondary/50 transition-colors text-muted-foreground hover:text-primary"
+                        title="Change Password"
+                    >
+                        <Key className="w-5 h-5" />
+                    </Link>
 
                     {/* Profile Button */}
                     <button

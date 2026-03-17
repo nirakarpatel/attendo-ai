@@ -19,6 +19,7 @@ import { storage, setUserId } from "./services/storage";
 import { supabase } from "./lib/supabaseClient";
 import { Auth } from "./components/Auth";
 import { ForgotPassword } from "./components/ForgotPassword";
+import { ChangePassword } from "./components/ChangePassword";
 
 function App() {
   const [session, setSession] = useState(null);
@@ -136,6 +137,7 @@ function App() {
   return (
     <Routes>
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/" element={
         !session || isResetMode ? (
           <Auth forceResetMode={isResetMode} onPasswordUpdated={() => setIsResetMode(false)} />
