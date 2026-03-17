@@ -59,9 +59,19 @@ export const storage = {
                 supabase.from('holidays').select('*').eq('user_id', userId)
             ]);
 
+            const formattedSubjects = (subjects || []).map(s => {
+                const logs = (attendanceLog || []).filter(l => l.subject_id === s.id);
+                return {
+                    ...s,
+                    target: s.target_percentage,
+                    total: logs.length,
+                    attended: logs.filter(l => l.status === 'present').length
+                };
+            });
+
             return {
                 profile: profile || null,
-                subjects: subjects || [],
+                subjects: formattedSubjects,
                 attendanceLog: attendanceLog || [],
                 timetable: timetable || [],
                 holidays: holidays || [],
@@ -87,11 +97,23 @@ export const storage = {
 
     // ============ SUBJECT METHODS ============
     getSubjects: async () => {
-        const { data, error } = await supabase
-            .from('subjects')
-            .select('*')
-            .eq('user_id', getUserId());
-        return error ? [] : data;
+        const userId = getUserId();
+        const [{ data: subjects }, { data: logs }] = await Promise.all([
+            supabase.from('subjects').select('*').eq('user_id', userId),
+            supabase.from('attendance_logs').select('subject_id, status').eq('user_id', userId)
+        ]);
+        
+        if (!subjects) return [];
+
+        return subjects.map(s => {
+            const subjectLogs = (logs || []).filter(l => l.subject_id === s.id);
+            return {
+                ...s,
+                target: s.target_percentage,
+                total: subjectLogs.length,
+                attended: subjectLogs.filter(l => l.status === 'present').length
+            };
+        });
     },
 
     addSubject: async (name, target = 75) => {
@@ -102,17 +124,65 @@ export const storage = {
             .single();
         
         if (error) console.error("Error adding subject", error);
-        return data ? [data] : []; // Returning as array for backwards compatibility in components, though we might need to fetch all
+        return data ? [{ ...data, target: data.target_percentage, total: 0, attended: 0 }] : []; 
     },
 
     updateSubject: async (updatedSubject) => {
+        const target = updatedSubject.target !== undefined ? updatedSubject.target : updatedSubject.target_percentage;
         const { data, error } = await supabase
             .from('subjects')
-            .update({ name: updatedSubject.name, target_percentage: updatedSubject.target_percentage }) // Note: attended/total are now derived
+            .update({ name: updatedSubject.name, target_percentage: target }) // Note: attended/total are derived from logs
             .eq('id', updatedSubject.id)
             .eq('user_id', getUserId())
             .select();
         if (error) console.error("Error updating subject", error);
+        
+        // Handle arbitrary total/attended updates from EditAttendance by adding/removing dummy logs
+        const { data: logs } = await supabase.from('attendance_logs').select('id, status, date').eq('subject_id', updatedSubject.id);
+        const currentAttended = (logs || []).filter(l => l.status === 'present').length;
+        const currentTotal = (logs || []).length;
+        
+        if (updatedSubject.attended !== undefined && updatedSubject.total !== undefined) {
+            const diffAttended = updatedSubject.attended - currentAttended;
+            const diffAbsent = (updatedSubject.total - updatedSubject.attended) - (currentTotal - currentAttended);
+            
+            const existingDates = new Set((logs || []).map(l => l.date));
+            let dummyDate = new Date('2000-01-01');
+            
+            const insertLogs = async (count, status) => {
+                if (count <= 0) return;
+                const newLogs = [];
+                for (let i = 0; i < count; i++) {
+                    let dateStr;
+                    do {
+                        dummyDate.setDate(dummyDate.getDate() + 1);
+                        dateStr = dummyDate.toISOString().split('T')[0];
+                    } while (existingDates.has(dateStr));
+                    
+                    newLogs.push({ user_id: getUserId(), subject_id: updatedSubject.id, date: dateStr, status });
+                    existingDates.add(dateStr);
+                }
+                await supabase.from('attendance_logs').insert(newLogs);
+            };
+
+            const removeLogs = async (count, status) => {
+                if (count <= 0) return;
+                const logsToRemove = (logs || []).filter(l => l.status === status).slice(0, count);
+                const idsToRemove = logsToRemove.map(l => l.id);
+                if (idsToRemove.length > 0) {
+                    await supabase.from('attendance_logs').delete().in('id', idsToRemove);
+                }
+            };
+            
+            // Adjust Presents
+            if (diffAttended > 0) await insertLogs(diffAttended, 'present');
+            else if (diffAttended < 0) await removeLogs(-diffAttended, 'present');
+            
+            // Adjust Absents
+            if (diffAbsent > 0) await insertLogs(diffAbsent, 'absent');
+            else if (diffAbsent < 0) await removeLogs(-diffAbsent, 'absent');
+        }
+
         return data; 
     },
 
