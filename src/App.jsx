@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { Plus, LogOut } from "lucide-react";
 import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";
@@ -17,6 +18,7 @@ import { Button } from "./components/ui/Button";
 import { storage, setUserId } from "./services/storage";
 import { supabase } from "./lib/supabaseClient";
 import { Auth } from "./components/Auth";
+import { ForgotPassword } from "./components/ForgotPassword";
 
 function App() {
   const [session, setSession] = useState(null);
@@ -128,140 +130,139 @@ function App() {
     ? Math.round(subjects.reduce((acc, sub) => acc + (sub.total === 0 ? 100 : (sub.attended / sub.total) * 100), 0) / subjects.length)
     : 0;
 
-  if (isSessionLoading || (session && loading)) return <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
-    <div className="w-8 h-8 flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
-    </div>
-    <span className="text-muted-foreground font-medium">Loading Attendance...</span>
-  </div>;
-
-  if (!session || isResetMode) {
-    return <Auth forceResetMode={isResetMode} onPasswordUpdated={() => setIsResetMode(false)} />;
-  }
-
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <Header
-        profile={profile}
-        onEditProfile={() => setIsProfileModalOpen(true)}
-        onOpenBackup={() => setIsBackupModalOpen(true)}
-        onOpenCalendar={() => setIsCalendarOpen(true)}
-        onOpenHolidays={() => setIsHolidaysOpen(true)}
-        onOpenShare={() => setIsShareOpen(true)}
-        onOpenNotifications={() => setIsNotificationsOpen(true)}
-        onSignOut={() => supabase.auth.signOut()}
-      />
-
-      <main className="container mx-auto px-4 pt-8 max-w-5xl">
-        {/* Alert Banners */}
-        <AlertBanner subjects={subjects} streak={streak} />
-
-        {/* Welcome Section */}
-        <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-6 gap-4">
-          <div>
-            <h1 className="text-4xl font-bold mb-2">
-              {profile ? `${greeting}, ${profile.name}!` : "My Attendance"}
-            </h1>
-            <p className="text-muted-foreground">Track your progress and stay safe.</p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <StreakBadge streak={streak} />
-            {subjects.length > 0 && (
-              <div className="glass px-6 py-3 rounded-2xl flex items-center gap-4">
-                <span className="text-sm font-medium text-muted-foreground">Overall</span>
-                <span className="text-2xl font-bold text-primary">{overallPercentage}%</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Today's Schedule */}
-        <TodaySchedule />
-
-        {/* Subjects Grid */}
-        {subjects.length === 0 ? (
-          <div className="text-center py-20 border border-dashed border-white/10 rounded-3xl bg-secondary/5">
-            <p className="text-xl text-muted-foreground mb-6">No subjects added yet.</p>
-            <Button onClick={() => setIsModalOpen(true)} size="lg" className="rounded-full shadow-lg shadow-primary/20">
-              <Plus className="w-5 h-5 mr-2" />
-              Add Your First Subject
-            </Button>
-          </div>
+    <Routes>
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/" element={
+        !session || isResetMode ? (
+          <Auth forceResetMode={isResetMode} onPasswordUpdated={() => setIsResetMode(false)} />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {subjects.map(subject => (
-              <SubjectCard
-                key={subject.id}
-                subject={subject}
-                onUpdate={handleUpdateSubject}
-                onDelete={handleDeleteSubject}
-              />
-            ))}
+          <div className="min-h-screen bg-background pb-20">
+            <Header
+              profile={profile}
+              onEditProfile={() => setIsProfileModalOpen(true)}
+              onOpenBackup={() => setIsBackupModalOpen(true)}
+              onOpenCalendar={() => setIsCalendarOpen(true)}
+              onOpenHolidays={() => setIsHolidaysOpen(true)}
+              onOpenShare={() => setIsShareOpen(true)}
+              onOpenNotifications={() => setIsNotificationsOpen(true)}
+              onSignOut={() => supabase.auth.signOut()}
+            />
 
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/10 rounded-2xl hover:border-primary/50 hover:bg-primary/5 transition-all group h-full min-h-[200px]"
-            >
-              <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                <Plus className="w-6 h-6 text-primary" />
+            <main className="container mx-auto px-4 pt-8 max-w-5xl">
+              {/* Alert Banners */}
+              <AlertBanner subjects={subjects} streak={streak} />
+
+              {/* Welcome Section */}
+              <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-6 gap-4">
+                <div>
+                  <h1 className="text-4xl font-bold mb-2">
+                    {profile ? `${greeting}, ${profile.name}!` : "My Attendance"}
+                  </h1>
+                  <p className="text-muted-foreground">Track your progress and stay safe.</p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <StreakBadge streak={streak} />
+                  {subjects.length > 0 && (
+                    <div className="glass px-6 py-3 rounded-2xl flex items-center gap-4">
+                      <span className="text-sm font-medium text-muted-foreground">Overall</span>
+                      <span className="text-2xl font-bold text-primary">{overallPercentage}%</span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <span className="font-medium text-muted-foreground group-hover:text-primary">Add New Subject</span>
-            </button>
+
+              {/* Today's Schedule */}
+              <TodaySchedule />
+
+              {/* Subjects Grid */}
+              {subjects.length === 0 ? (
+                <div className="text-center py-20 border border-dashed border-white/10 rounded-3xl bg-secondary/50">
+                  <p className="text-xl text-muted-foreground mb-6">No subjects added yet.</p>
+                  <Button onClick={() => setIsModalOpen(true)} size="lg" className="rounded-full shadow-lg shadow-primary/20">
+                    <Plus className="w-5 h-5 mr-2" />
+                    Add Your First Subject
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {subjects.map(subject => (
+                    <SubjectCard
+                      key={subject.id}
+                      subject={subject}
+                      onUpdate={handleUpdateSubject}
+                      onDelete={handleDeleteSubject}
+                    />
+                  ))}
+
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/10 rounded-2xl hover:border-primary/50 hover:bg-primary/5 transition-all group h-full min-h-[200px]"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                      <Plus className="w-6 h-6 text-primary" />
+                    </div>
+                    <span className="font-medium text-muted-foreground group-hover:text-primary">Add New Subject</span>
+                  </button>
+                </div>
+              )}
+            </main>
+
+            {/* Modals */}
+            <AddSubjectModal
+              isOpen={isModalOpen}
+              onClose={() => setIsModalOpen(false)}
+              onAdd={handleAddSubject}
+            />
+
+            <ProfileModal
+              isOpen={isProfileModalOpen}
+              onClose={() => setIsProfileModalOpen(false)}
+              onSave={handleSaveProfile}
+              currentName={profile?.name}
+            />
+
+            <DataBackup
+              isOpen={isBackupModalOpen}
+              onClose={() => setIsBackupModalOpen(false)}
+              onDataImported={handleDataImported}
+            />
+
+            <AttendanceCalendar
+              isOpen={isCalendarOpen}
+              onClose={() => setIsCalendarOpen(false)}
+              subjects={subjects}
+            />
+
+            <HolidayManager
+              isOpen={isHolidaysOpen}
+              onClose={() => setIsHolidaysOpen(false)}
+              onUpdate={loadData}
+            />
+
+            <ShareProgress
+              isOpen={isShareOpen}
+              onClose={() => setIsShareOpen(false)}
+              profile={profile}
+              subjects={subjects}
+              streak={streak}
+            />
+
+            <NotificationSettings
+              isOpen={isNotificationsOpen}
+              onClose={() => setIsNotificationsOpen(false)}
+            />
+
+            <Footer />
           </div>
-        )}
-      </main>
-
-      {/* Modals */}
-      <AddSubjectModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onAdd={handleAddSubject}
-      />
-
-      <ProfileModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-        onSave={handleSaveProfile}
-        currentName={profile?.name}
-      />
-
-      <DataBackup
-        isOpen={isBackupModalOpen}
-        onClose={() => setIsBackupModalOpen(false)}
-        onDataImported={handleDataImported}
-      />
-
-      <AttendanceCalendar
-        isOpen={isCalendarOpen}
-        onClose={() => setIsCalendarOpen(false)}
-        subjects={subjects}
-      />
-
-      <HolidayManager
-        isOpen={isHolidaysOpen}
-        onClose={() => setIsHolidaysOpen(false)}
-        onUpdate={loadData}
-      />
-
-      <ShareProgress
-        isOpen={isShareOpen}
-        onClose={() => setIsShareOpen(false)}
-        profile={profile}
-        subjects={subjects}
-        streak={streak}
-      />
-
-      <NotificationSettings
-        isOpen={isNotificationsOpen}
-        onClose={() => setIsNotificationsOpen(false)}
-      />
-
-      <Footer />
-    </div>
+        )
+      } />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 

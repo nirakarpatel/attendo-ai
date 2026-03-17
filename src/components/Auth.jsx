@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { LogIn, Key, Mail, Loader2, AlertCircle } from "lucide-react";
 import { Card } from "./ui/Card";
 import { Button } from "./ui/Button";
@@ -7,7 +8,6 @@ import { supabase } from "../lib/supabaseClient";
 export function Auth({ forceResetMode, onPasswordUpdated }) {
     const [isLoading, setIsLoading] = useState(false);
     const [isSignUp, setIsSignUp] = useState(false);
-    const [isResetPassword, setIsResetPassword] = useState(false);
     const [isUpdatePassword, setIsUpdatePassword] = useState(forceResetMode || false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -29,13 +29,6 @@ export function Auth({ forceResetMode, onPasswordUpdated }) {
                 setMessage('Success! Your password has been updated.');
                 setIsUpdatePassword(false);
                 if (onPasswordUpdated) onPasswordUpdated();
-            } else if (isResetPassword) {
-                const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                    redirectTo: 'https://attendoai.netlify.app/'
-                });
-                if (error) throw error;
-                setMessage('Success! Check your email for a password reset link.');
-                setIsResetPassword(false);
             } else if (isSignUp) {
                 const { error } = await supabase.auth.signUp({
                     email,
@@ -81,10 +74,10 @@ export function Auth({ forceResetMode, onPasswordUpdated }) {
                         <Key className="w-8 h-8 text-primary" />
                     </div>
                     <h2 className="text-3xl font-extrabold text-foreground tracking-tight">
-                        {isUpdatePassword ? 'Set New Password' : isResetPassword ? 'Reset Password' : isSignUp ? 'Create your account' : 'Welcome to Attendo'}
+                        {isUpdatePassword ? 'Set New Password' : isSignUp ? 'Create your account' : 'Welcome to Attendo'}
                     </h2>
                     <p className="text-muted-foreground mt-2">
-                        {isUpdatePassword ? 'Enter your new password below' : isResetPassword ? 'Enter your email to receive a reset link' : isSignUp ? 'Sign up to sync your attendance everywhere' : 'Sign in to access your attendance data'}
+                        {isUpdatePassword ? 'Enter your new password below' : isSignUp ? 'Sign up to sync your attendance everywhere' : 'Sign in to access your attendance data'}
                     </p>
                 </div>
 
@@ -129,13 +122,12 @@ export function Auth({ forceResetMode, onPasswordUpdated }) {
                                         {isUpdatePassword ? 'New Password' : 'Password'}
                                     </label>
                                     {!isSignUp && !isUpdatePassword && (
-                                        <button 
-                                            type="button" 
-                                            onClick={() => { setIsResetPassword(true); setError(null); setMessage(null); }}
+                                        <Link 
+                                            to="/forgot-password"
                                             className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
                                         >
                                             Forgot Password?
-                                        </button>
+                                        </Link>
                                     )}
                                 </div>
                                 <div className="relative">
@@ -161,11 +153,11 @@ export function Auth({ forceResetMode, onPasswordUpdated }) {
                             disabled={isLoading}
                         >
                             {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
-                            {isUpdatePassword ? 'Update Password' : isResetPassword ? 'Send Reset Link' : isSignUp ? 'Sign Up' : 'Sign In'}
+                            {isUpdatePassword ? 'Update Password' : isSignUp ? 'Sign Up' : 'Sign In'}
                         </Button>
                     </form>
 
-                    {!isResetPassword && !isUpdatePassword && <>
+                    {!isUpdatePassword && <>
                         <div className="mt-6 flex items-center justify-center">
                             <div className="border-t border-white/10 flex-grow"></div>
                             <span className="px-3 text-xs text-muted-foreground uppercase font-medium">Or continue with</span>
@@ -199,13 +191,6 @@ export function Auth({ forceResetMode, onPasswordUpdated }) {
                             className="text-primary hover:text-primary/80 font-medium hover:underline transition-all"
                         >
                             Cancel and go back
-                        </button>
-                    ) : isResetPassword ? (
-                        <button
-                            onClick={() => { setIsResetPassword(false); setError(null); setMessage(null); }}
-                            className="text-primary hover:text-primary/80 font-medium hover:underline transition-all"
-                        >
-                            Back to sign in
                         </button>
                     ) : (
                         <>
